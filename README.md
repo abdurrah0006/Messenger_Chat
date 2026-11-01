@@ -189,25 +189,29 @@ npm run dev
 
 ## 📸 Screenshots
 
-### 🏠 Chat Dashboard
+### 🏠 Chat Main
 
-![Dashboard](./images/dashboard.png)
+![ChatMain](./image/Chat_Dark.png)
 
-### 💬 Private Chat
+###  🔐 Login
 
-![Private Chat](./images/private-chat.png)
+![Login](./image/Chat_login.png)
 
-### 👥 Group Chat
+### 🔏 Register
 
-![Group Chat](./images/group-chat.png)
+![Register](./image/Chat_Register.png)
 
-### 🔔 Notifications
+### 💬 Message
 
-![Notifications](./images/notifications.png)
+![Message](./image/Message.png)
 
 ### 👤 Profile Page
 
-![Profile](./images/profile.png)
+![Profile](./image/Profile.png)
+
+### 👥 Group Chat
+
+![Group Chat](./image/Group_Chat.png)
 
 ---
 
@@ -245,7 +249,8 @@ npm run dev
 
 If you like this project or want to collaborate:
 
-* GitHub: https://github.com/abdurrah2511
+* GitHub: https://github.com/abdurrah0006
+* Linkedin: https://linkedin.com/in/abdurrah0006
 
 ---
 

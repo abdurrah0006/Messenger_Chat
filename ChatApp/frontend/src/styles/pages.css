@@ -46,8 +46,8 @@
   align-items: center;
   padding: 48px;
   border-radius: var(--radius-lg);
-  background: #0a0a0a;
-  color: #fafafa;
+  background: var(--kimbie-bg);
+  color: var(--kimbie-text);
   padding-left: 200px;
 }
 
