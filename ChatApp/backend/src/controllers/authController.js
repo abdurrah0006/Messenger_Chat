@@ -1,78 +1,60 @@
 import bcrypt from "bcryptjs";
+
 import User from "../models/User.js";
-import jwt from "jsonwebtoken";
-
 import generateToken from "../utils/generateToken.js";
+import { httpError } from "../utils/httpError.js";
 
-import asyncHandler from "../middleware/asyncHandler.js";
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// REGISTER USER
-export const registerUser = asyncHandler(async (req, res) => {
+export const publicUser = (user) => ({
+  _id: user._id,
+  name: user.name,
+  email: user.email,
+  createdAt: user.createdAt,
+});
 
-  const { name, email, password } = req.body;
+const withToken = (user) => ({ ...publicUser(user), token: generateToken(user._id) });
 
-  // check missing fields
-  if (!name || !email || !password) {
-    res.status(400);
-    throw new Error("Please fill all fields");
+export const registerUser = async (req, res) => {
+  const { name, email, password } = req.body ?? {};
+
+  if (!name?.trim() || !email?.trim() || !password) {
+    throw httpError(400, "Name, email and password are required");
+  }
+  if (name.trim().length > 50) throw httpError(400, "Name is too long");
+  if (!EMAIL_PATTERN.test(email.trim())) throw httpError(400, "Enter a valid email");
+  if (password.length < 6) {
+    throw httpError(400, "Password must be at least 6 characters");
   }
 
-  // check existing user
-  const existingUser = await User.findOne({ email });
-
-  if (existingUser) {
-    res.status(400);
-    throw new Error("User already exists");
+  const normalizedEmail = email.trim().toLowerCase();
+  if (await User.exists({ email: normalizedEmail })) {
+    throw httpError(409, "An account with this email already exists");
   }
 
-  // hash password
-  const salt = await bcrypt.genSalt(10);
-  const hashedPassword = await bcrypt.hash(password, salt);
-
-  // create user
   const user = await User.create({
     name,
-    email,
-    password: hashedPassword,
+    email: normalizedEmail,
+    password: await bcrypt.hash(password, 10),
   });
 
-  // response
-  res.status(201).json({
-    _id: user._id,
-    name: user.name,
-    email: user.email,
-    token: generateToken(user._id),
-  });
+  res.status(201).json(withToken(user));
+};
 
-});
+export const loginUser = async (req, res) => {
+  const { email, password } = req.body ?? {};
 
-// LOGIN USER
-export const loginUser = asyncHandler(async (req, res) => {
+  if (!email || !password) throw httpError(400, "Email and password are required");
 
-  const { email, password } = req.body;
+  const user = await User.findOne({ email: String(email).trim().toLowerCase() }).select(
+    "+password"
+  );
 
-  // check user
-  const user = await User.findOne({ email });
-
-  if (!user) {
-    res.status(401);
-    throw new Error("Invalid credentials");
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    throw httpError(401, "Invalid email or password");
   }
 
-  // compare password
-  const isMatch = await bcrypt.compare(password, user.password);
+  res.json(withToken(user));
+};
 
-  if (!isMatch) {
-    res.status(401);
-    throw new Error("Invalid credentials");
-  }
-
-  // response
-  res.status(200).json({
-    _id: user._id,
-    name: user.name,
-    email: user.email,
-    token: generateToken(user._id),
-  });
-
-});
+export const getMe = (req, res) => res.json(publicUser(req.user));

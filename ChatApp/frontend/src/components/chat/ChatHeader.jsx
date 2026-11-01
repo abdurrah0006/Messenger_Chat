@@ -1,29 +1,50 @@
-import { useContext } from "react";
-import { ChatContext } from "../../context/ChatContext";
-import { AuthContext } from "../../context/AuthContext";
+import { Link } from "react-router-dom";
+import { ArrowLeft, Info } from "lucide-react";
+
 import Avatar from "../common/Avatar";
-import getSender from "../../utils/getSender";
+import { useAuth } from "../../hooks/useAuth";
+import { useSocket } from "../../hooks/useSocket";
+import { getChatName, getOtherUser } from "../../utils/chat";
 
-const ChatHeader = () => {
-  const { selectedChat } = useContext(ChatContext);
-  const { user } = useContext(AuthContext);
+const ChatHeader = ({ chat, infoOpen, onToggleInfo }) => {
+  const { user } = useAuth();
+  const { onlineUsers } = useSocket();
 
-  if (!selectedChat) return null;
+  const name = getChatName(chat, user);
+  const other = chat.isGroupChat ? null : getOtherUser(chat, user);
+  const online = other ? onlineUsers.includes(other._id) : false;
 
-  const name = selectedChat.isGroupChat
-    ? selectedChat.chatName
-    : getSender(user, selectedChat.users);
+  const subtitle = chat.isGroupChat
+    ? chat.users.map((member) => (member._id === user._id ? "You" : member.name)).join(", ")
+    : online
+      ? "Online"
+      : "Offline";
 
   return (
-    <div className="chat-header">
-      <div className="chat-header-inner">
-        <Avatar name={name} />
-        <div className="chat-header-info">
-          <h2 className="chat-title">{name}</h2>
-          <p className="chat-sub">{selectedChat.isGroupChat ? `${selectedChat.users.length} members` : ""}</p>
-        </div>
-      </div>
-    </div>
+    <header className="thread-header">
+      <Link to="/" className="icon-btn thread-header__back" aria-label="Back to chats">
+        <ArrowLeft size={20} />
+      </Link>
+
+      <button type="button" className="thread-header__who" onClick={onToggleInfo}>
+        <Avatar name={name} group={chat.isGroupChat} online={online} />
+        <span className="thread-header__text">
+          <strong>{name}</strong>
+          <small className={online ? "is-online" : ""}>{subtitle}</small>
+        </span>
+      </button>
+
+      <button
+        type="button"
+        className={`icon-btn ${infoOpen ? "is-active" : ""}`}
+        onClick={onToggleInfo}
+        aria-label={chat.isGroupChat ? "Group info" : "Contact info"}
+        aria-pressed={infoOpen}
+        title={chat.isGroupChat ? "Group info" : "Contact info"}
+      >
+        <Info size={20} />
+      </button>
+    </header>
   );
 };
 

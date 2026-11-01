@@ -1,90 +1,94 @@
-import { useState, useContext } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Eye, EyeOff, Lock, Mail } from "lucide-react";
+
+import Alert from "../../components/common/Alert";
+import Field from "../../components/common/Field";
+import Spinner from "../../components/common/Spinner";
 import { loginUser } from "../../api/authApi";
-import { AuthContext } from "../../context/AuthContext";
+import { getErrorMessage } from "../../api/axios";
+import { useAuth } from "../../hooks/useAuth";
 
 const Login = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const { login } = useAuth();
+
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const { login } = useContext(AuthContext);
-  const navigate = useNavigate();
+  const update = (key) => (event) => setForm((prev) => ({ ...prev, [key]: event.target.value }));
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!form.email.trim() || !form.password) {
+      return setError("Enter your email and password.");
+    }
+
     setError("");
-
+    setLoading(true);
     try {
-      const { data } = await loginUser({ email, password });
-      login(data);
-      navigate("/");
+      const { data } = await loginUser({ email: form.email.trim(), password: form.password });
+      login(data); // GuestRoute redirects to the app once the user is set
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed. Please check your credentials.");
+      setError(getErrorMessage(err, "Sign in failed. Please try again."));
+      setLoading(false);
     }
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-grid">
-        <div className="auth-aside">
-          <div className="aside-card">
-            <p className="muted small">Why Chat App</p>
-            <h2 className="aside-title">Built for modern conversations</h2>
-            <p className="muted">A polished chat experience designed for speed, privacy, and collaboration.</p>
-          </div>
+    <div className="auth-card">
+      <header className="auth-card__header">
+        <h1>Welcome back</h1>
+        <p>Sign in to continue to your chats.</p>
+      </header>
 
-          <div className="aside-list">
-            <div className="aside-item">
-              <p className="font-semibold">Groups & teams</p>
-              <p className="muted">Create group chats for friends, work, or communities.</p>
-            </div>
-            <div className="aside-item">
-              <p className="font-semibold">Privacy first</p>
-              <p className="muted">Your data is secure with end-to-end encryption.</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="auth-card">
-          <div className="auth-head">
-            <p className="muted small">Welcome back</p>
-            <h1 className="auth-title">Sign in</h1>
-            <p className="muted">Securely access your chats and stay connected.</p>
-          </div>
+      <form className="stack stack--lg" onSubmit={handleSubmit} noValidate>
+        {error && <Alert>{error}</Alert>}
 
-          {error && <div className="alert alert-error">{error}</div>}
+        <Field
+          id="email"
+          label="Email"
+          icon={Mail}
+          type="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          value={form.email}
+          onChange={update("email")}
+          autoFocus
+        />
 
-          <form onSubmit={handleSubmit} className="auth-form">
-            <label className="label">Email</label>
-            <input
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="input"
-              placeholder="you@example.com"
-            />
+        <Field
+          id="password"
+          label="Password"
+          icon={Lock}
+          type={showPassword ? "text" : "password"}
+          autoComplete="current-password"
+          placeholder="Your password"
+          value={form.password}
+          onChange={update("password")}
+          trailing={
+            <button
+              type="button"
+              className="icon-btn icon-btn--sm"
+              onClick={() => setShowPassword((show) => !show)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          }
+        />
 
-            <label className="label">Password</label>
-            <input
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="input"
-              placeholder="Enter your password"
-            />
+        <button type="submit" className="btn btn--primary btn--lg btn--block" disabled={loading}>
+          {loading && <Spinner size={16} />}
+          Sign in
+        </button>
+      </form>
 
-            <button type="submit" className="btn btn-block btn-accent">Sign in</button>
-          </form>
-
-          <p className="auth-foot">
-            Don&apos;t have an account?{' '}
-            <Link to="/register" className="link">Create one</Link>
-          </p>
-        </div>
-      </div>
+      <p className="auth-card__footer">
+        New here? <Link to="/register">Create an account</Link>
+      </p>
     </div>
   );
 };

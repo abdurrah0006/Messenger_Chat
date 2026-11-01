@@ -1,86 +1,55 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 
+import { ThemeProvider } from "./context/ThemeContext";
 import { AuthProvider } from "./context/AuthContext";
-import { ChatProvider } from "./context/ChatContext";
-import { SocketProvider } from "./context/SocketContext";
+
+import GuestRoute from "./routes/GuestRoute";
+import ProtectedRoute from "./routes/ProtectedRoute";
 
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
+import ChatPage from "./pages/chat/ChatPage";
+import ChatRoute, { NoChatSelected } from "./pages/chat/ChatRoute";
+import ProfilePage from "./pages/profile/ProfilePage";
 
-import ProtectedRoute from "./routes/ProtectedRoute";
-import MainLayout from "./layouts/MainLayout";
-import AuthLayout from "./layouts/AuthLayout";
-
-import Profile from "./pages/profile/Profile";
-import Home from "./pages/chat/Home";
-import GroupPage from "./pages/chat/GroupPage";
-
-const App = () => {
-  return (
-    <BrowserRouter>
-
-      {/* AUTH LAYER */}
-      <AuthProvider>
-        <SocketProvider>
-          <ChatProvider>
-
-            <Routes>
-              <Route
-                path="/login"
-                element={
-                  <AuthLayout>
-                    <Login />
-                  </AuthLayout>
-                }
-              />
-
-              <Route
-                path="/register"
-                element={
-                  <AuthLayout>
-                    <Register />
-                  </AuthLayout>
-                }
-              />
-
-              <Route
-                path="/profile"
-                element={
-                  <ProtectedRoute>
-                    <Profile/>
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
-                path="/groups"
-                element={
-                  <ProtectedRoute>
-                    <GroupPage />
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <Home />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
-
-          </ChatProvider>
-        </SocketProvider>
-      </AuthProvider>
-
-    </BrowserRouter>
-  );
+const toastOptions = {
+  duration: 3500,
+  style: {
+    background: "var(--accent)",
+    color: "var(--on-accent)",
+    borderRadius: "10px",
+    fontSize: "14px",
+    padding: "10px 14px",
+  },
+  iconTheme: { primary: "var(--on-accent)", secondary: "var(--accent)" },
 };
+
+const App = () => (
+  <ThemeProvider>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<GuestRoute />}>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+          </Route>
+
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<ChatPage />}>
+              <Route index element={<NoChatSelected />} />
+              <Route path="chat/:chatId" element={<ChatRoute />} />
+            </Route>
+            <Route path="/profile" element={<ProfilePage />} />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+
+      <Toaster position="top-center" toastOptions={toastOptions} />
+    </AuthProvider>
+  </ThemeProvider>
+);
 
 export default App;

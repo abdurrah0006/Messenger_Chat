@@ -1,34 +1,19 @@
 import API from "./axios";
 
-export const accessChat = (userId) =>
-  API.post("/chats", { userId });
+// Chats
+export const fetchChats = () => API.get("/chats");
+export const accessChat = (userId) => API.post("/chats", { userId });
+export const markRead = (chatId) => API.put(`/chats/${chatId}/read`);
 
-export const createChat = (userId) =>
-  API.post("/chats", { userId });
+// Groups
+export const createGroup = (data) => API.post("/chats/group", data);
+export const renameGroup = (chatId, name) => API.put(`/chats/${chatId}/rename`, { name });
+export const addMembers = (chatId, userIds) => API.put(`/chats/${chatId}/members`, { userIds });
+export const removeMember = (chatId, userId) =>
+  API.delete(`/chats/${chatId}/members/${userId}`);
 
-export const fetchChats = () =>
-  API.get("/chats");
-
-export const fetchMessages = (chatId) =>
-  API.get(`/messages/${chatId}`);
-
-export const sendMessage = (data) =>
-  API.post("/messages", data);
-
-export const createGroup = (data) =>
-  API.post("/chats/group", data);
-
-export const renameGroup = (data) =>
-  API.put("/chats/rename", data);
-
-export const addToGroup = (data) =>
-  API.put("/chats/group/add", data);
-
-export const removeFromGroup = (data) =>
-  API.put("/chats/group/remove", data);
-
-export const leaveGroup = (id) =>
-  API.put(`/chats/leave/${id}`);
-
-export const resetUnread = (id) =>
-  API.put(`/chats/reset-unread/${id}`);
+// Messages
+export const fetchMessages = (chatId, before) =>
+  API.get(`/messages/${chatId}`, { params: before ? { before } : {} });
+export const sendMessage = (data) => API.post("/messages", data);
+export const deleteMessage = (messageId) => API.delete(`/messages/${messageId}`);

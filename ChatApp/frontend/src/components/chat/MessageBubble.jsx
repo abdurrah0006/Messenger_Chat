@@ -1,31 +1,52 @@
-import { useContext } from "react";
+import { Ban, Trash2 } from "lucide-react";
 
-import { AuthContext } from "../../context/AuthContext";
 import Avatar from "../common/Avatar";
-import SeenStatus from "./SeenStatus";
+import MessageStatus from "./MessageStatus";
+import { formatTime } from "../../utils/format";
 
-const MessageBubble = ({ message }) => {
-  const { user } = useContext(AuthContext);
-  const isMine = message.sender._id === user._id;
+const MessageBubble = ({ message, isMine, isGroup, startsRun, otherCount, onDelete }) => {
+  const showSender = isGroup && !isMine;
 
   return (
-    <div className={`message-row ${isMine ? 'mine' : 'other'}`}>
-      {!isMine && (
-        <div className="message-avatar">
-          <Avatar name={message.sender.name} />
+    <div
+      className={`msg ${isMine ? "msg--mine" : "msg--other"} ${startsRun ? "msg--start" : ""}`}
+    >
+      {showSender && (
+        <div className="msg__avatar">
+          {startsRun && <Avatar name={message.sender.name} size="sm" />}
         </div>
       )}
 
-      <div className={`message-bubble ${isMine ? 'bubble-mine' : 'bubble-other'}`}>
-        {message.sender?.name && !isMine && (
-          <p className="bubble-sender">{message.sender.name}</p>
-        )}
+      <div className="msg__stack">
+        {showSender && startsRun && <span className="msg__sender">{message.sender.name}</span>}
 
-        <p className="bubble-content">{message.content}</p>
+        <div className="msg__line">
+          {isMine && !message.isDeleted && (
+            <button
+              type="button"
+              className="icon-btn icon-btn--sm msg__delete"
+              onClick={() => onDelete(message)}
+              aria-label="Delete message"
+              title="Delete message"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
 
-        <div className="bubble-meta">
-          <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-          {isMine && <SeenStatus message={message} />}
+          {message.isDeleted ? (
+            <div className="bubble bubble--deleted">
+              <Ban size={14} />
+              <span>This message was deleted</span>
+            </div>
+          ) : (
+            <div className="bubble">
+              <p className="bubble__text">{message.content}</p>
+              <span className="bubble__meta">
+                <time dateTime={message.createdAt}>{formatTime(message.createdAt)}</time>
+                {isMine && <MessageStatus message={message} otherCount={otherCount} />}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

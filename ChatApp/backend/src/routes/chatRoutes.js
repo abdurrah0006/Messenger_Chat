@@ -1,35 +1,24 @@
-
 import express from "express";
 import protect from "../middleware/authMiddleware.js";
-
 import {
   accessChat,
-  fetchChats,
+  addMembers,
   createGroup,
+  fetchChats,
+  markRead,
+  removeMember,
   renameGroup,
-  addToGroup,
-  removeFromGroup,
-  leaveGroup,
-  resetUnread,
 } from "../controllers/chatController.js";
 
 const router = express.Router();
 
-router.post("/", protect, accessChat);
+router.use(protect);
 
-router.get("/", protect, fetchChats);
-
-router.post("/group", protect, createGroup);
-
-router.put("/rename", protect, renameGroup);
-
-router.put("/group/add", protect, addToGroup);
-
-router.put("/group/remove", protect, removeFromGroup);
-
-router.put("/leave/:id", protect, leaveGroup);
-
-router.put("/reset-unread/:id", protect, resetUnread);
+router.route("/").get(fetchChats).post(accessChat);
+router.post("/group", createGroup);
+router.put("/:id/rename", renameGroup);
+router.put("/:id/members", addMembers);
+router.delete("/:id/members/:userId", removeMember);
+router.put("/:id/read", markRead);
 
 export default router;
-

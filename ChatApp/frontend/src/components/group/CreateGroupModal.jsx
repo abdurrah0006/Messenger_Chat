@@ -1,95 +1,82 @@
-import { useEffect, useState } from "react";
-import { createGroup } from "../../api/chatApi";
-import { searchUsers } from "../../api/userApi";
+import { useState } from "react";
+import { Users } from "lucide-react";
+import toast from "react-hot-toast";
+
+import Alert from "../common/Alert";
+import Field from "../common/Field";
 import Modal from "../common/Modal";
+import Spinner from "../common/Spinner";
+import UserPicker from "./UserPicker";
 
-const CreateGroupModal = ({ onCreated, onClose }) => {
+import { getErrorMessage } from "../../api/axios";
+import { useChat } from "../../hooks/useChat";
+
+const CreateGroupModal = ({ onClose, onCreated }) => {
+  const { createGroup } = useChat();
+
   const [name, setName] = useState("");
-  const [selected, setSelected] = useState([]);
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [members, setMembers] = useState([]);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const toggleUser = (id) => {
-    setSelected((prev) => (prev.includes(id) ? prev.filter((u) => u !== id) : [...prev, id]));
-  };
-
-  useEffect(() => {
-    const loadUsers = async () => {
-      if (!query.trim()) {
-        setResults([]);
-        return;
-      }
-
-      setLoading(true);
-      setError("");
-
-      try {
-        const { data } = await searchUsers(query);
-        setResults(data);
-      } catch {
-        setError("Failed to search users");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const timeoutId = setTimeout(loadUsers, 300);
-    return () => clearTimeout(timeoutId);
-  }, [query]);
+  const toggleMember = (person) =>
+    setMembers((prev) =>
+      prev.some((item) => item._id === person._id)
+        ? prev.filter((item) => item._id !== person._id)
+        : [...prev, person]
+    );
 
   const handleCreate = async () => {
-    if (!name.trim()) {
-      setError("Please enter a group name.");
-      return;
-    }
+    if (!name.trim()) return setError("Give your group a name.");
+    if (members.length < 2) return setError("Add at least 2 people to create a group.");
 
-    if (selected.length < 2) {
-      setError("Select at least 2 users to create a group.");
-      return;
-    }
-
+    setError("");
+    setBusy(true);
     try {
-      const { data } = await createGroup({ name, users: JSON.stringify(selected) });
-      if (onCreated) onCreated(data);
-    } catch (error) {
-      console.error("Create group failed", error);
-      setError(error.response?.data?.message || "Create group failed");
+      const chat = await createGroup(
+        name.trim(),
+        members.map((person) => person._id)
+      );
+      toast.success("Group created");
+      onCreated(chat);
+    } catch (err) {
+      setError(getErrorMessage(err, "Could not create the group"));
+      setBusy(false);
     }
   };
 
   return (
-    <Modal onClose={onClose}>
-      <div className="modal-card">
-        <div className="modal-head">
-          <h2 className="modal-title">Create Group</h2>
-          <p className="muted">Choose a name and add members to your new group.</p>
-        </div>
+    <Modal
+      title="Create group"
+      description="Name your group and choose who to add."
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" className="btn btn--ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button type="button" className="btn btn--primary" onClick={handleCreate} disabled={busy}>
+            {busy && <Spinner size={16} />}
+            Create group
+          </button>
+        </>
+      }
+    >
+      <div className="stack">
+        <Field
+          id="group-name"
+          label="Group name"
+          icon={Users}
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          placeholder="e.g. Weekend plans"
+          maxLength={50}
+          autoFocus
+        />
 
-        <div className="modal-body">
-          <input placeholder="Group name" className="input" value={name} onChange={(e) => setName(e.target.value)} />
-          <input placeholder="Search users to add" className="input" value={query} onChange={(e) => setQuery(e.target.value)} />
+        {error && <Alert>{error}</Alert>}
 
-          <div className="search-results">
-            {loading && <p className="muted">Searching...</p>}
-            {error && <p className="alert-error">{error}</p>}
-            {results.map((u) => (
-              <button key={u._id} type="button" onClick={() => toggleUser(u._id)} className="list-item">{u.name}</button>
-            ))}
-          </div>
-
-          <div className="selected-list">
-            {selected.map((id) => (
-              <span key={id} className="badge">{id}</span>
-            ))}
-          </div>
-        </div>
-
-        <div className="modal-actions">
-          <button onClick={handleCreate} className="btn btn-accent">Create Group</button>
-          <button onClick={onClose} className="btn btn-ghost">Cancel</button>
-        </div>
+        <UserPicker selected={members} onToggle={toggleMember} />
       </div>
     </Modal>
   );

@@ -1,16 +1,17 @@
 import express from "express";
 import protect from "../middleware/authMiddleware.js";
-
 import {
-  sendMessage,
   allMessages,
   deleteMessage,
+  sendMessage,
 } from "../controllers/messageController.js";
 
 const router = express.Router();
 
-router.post("/", protect, sendMessage);
-router.get("/:chatId", protect, allMessages);
-router.delete("/:id", protect, deleteMessage);
+router.use(protect);
+
+router.post("/", sendMessage);
+router.get("/:chatId", allMessages);
+router.delete("/:id", deleteMessage);
 
 export default router;

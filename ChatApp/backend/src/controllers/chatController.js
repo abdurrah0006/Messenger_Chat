@@ -1,196 +1,189 @@
 import User from "../models/User.js";
 import Chat from "../models/Chat.js";
-import asyncHandler from "../middleware/asyncHandler.js";
+import Message from "../models/Message.js";
+import { httpError } from "../utils/httpError.js";
+import {
+  attachUnread,
+  findMemberChat,
+  isGroupAdmin,
+  isId,
+  withRelations,
+} from "../utils/chat.js";
+import { emitToChat, emitToUser, joinChat, leaveChat } from "../socket/index.js";
 
-// ACCESS OR CREATE ONE-TO-ONE CHAT
-export const accessChat = asyncHandler(async (req, res) => {
+const loadChat = (id) => withRelations(Chat.findById(id));
 
-  const { userId } = req.body;
+/** Sends the fresh chat to every current member so their sidebars update. */
+const broadcastChat = (chat) => emitToChat(chat.id, "chat:updated", chat.toJSON());
 
-  if (!userId) {
-    res.status(400);
-    throw new Error("UserId not provided");
+const requireGroupAdmin = async (chatId, user) => {
+  const chat = await findMemberChat(chatId, user._id);
+
+  if (!chat.isGroupChat) throw httpError(400, "This is not a group chat");
+  if (!isGroupAdmin(chat, user._id)) {
+    throw httpError(403, "Only the group admin can do this");
+  }
+  return chat;
+};
+
+// Find or create a one-to-one chat
+export const accessChat = async (req, res) => {
+  const { userId } = req.body ?? {};
+
+  if (!isId(userId)) throw httpError(400, "A valid userId is required");
+  if (userId === req.user.id) throw httpError(400, "You cannot chat with yourself");
+  if (!(await User.exists({ _id: userId }))) throw httpError(404, "User not found");
+
+  let chat = await withRelations(
+    Chat.findOne({
+      isGroupChat: false,
+      users: { $all: [req.user._id, userId], $size: 2 },
+    })
+  );
+
+  if (!chat) {
+    const created = await Chat.create({ users: [req.user._id, userId] });
+    chat = await loadChat(created._id);
   }
 
-  let chat = await Chat.findOne({
-    isGroupChat: false,
-    users: {
-      $all: [req.user._id, userId],
-    },
-  })
-    .populate("users", "-password")
-    .populate("latestMessage");
+  // Make sure both users' open sockets receive this chat's events
+  joinChat([req.user.id, userId], chat.id);
 
-  if (chat) {
-    return res.status(200).json(chat);
+  const [result] = await attachUnread([chat], req.user._id);
+  res.json(result);
+};
+
+export const fetchChats = async (req, res) => {
+  const chats = await withRelations(
+    Chat.find({ users: req.user._id }).sort({ updatedAt: -1 })
+  );
+
+  res.json(await attachUnread(chats, req.user._id));
+};
+
+export const createGroup = async (req, res) => {
+  const { name, users } = req.body ?? {};
+
+  const groupName = typeof name === "string" ? name.trim() : "";
+  if (!groupName) throw httpError(400, "Group name is required");
+  if (groupName.length > 50) throw httpError(400, "Group name is too long");
+  if (!Array.isArray(users)) throw httpError(400, "Members must be a list of user ids");
+
+  const memberIds = [...new Set(users.map(String))].filter((id) => id !== req.user.id);
+
+  if (!memberIds.every(isId)) throw httpError(400, "Invalid member id");
+  if (memberIds.length < 2) throw httpError(400, "Select at least 2 other members");
+
+  if ((await User.countDocuments({ _id: { $in: memberIds } })) !== memberIds.length) {
+    throw httpError(404, "Some of the selected users no longer exist");
   }
 
-  const createdChat = await Chat.create({
-    chatName: "sender",
-    isGroupChat: false,
-    users: [req.user._id, userId],
-  });
-
-  const fullChat = await Chat.findById(createdChat._id)
-    .populate("users", "-password");
-
-  res.status(201).json(fullChat);
-
-});
-
-// FETCH USER CHATS
-export const fetchChats = asyncHandler(async (req, res) => {
-
-  const chats = await Chat.find({
-    users: { $elemMatch: { $eq: req.user._id } },
-  })
-    .populate("users", "-password")
-    .populate("groupAdmin", "-password")
-    .populate("latestMessage")
-    .sort({ updatedAt: -1 });
-
-  res.status(200).json(chats);
-
-});
-
-// CREATE GROUP CHAT
-export const createGroup = asyncHandler(async (req, res) => {
-
-  const { name, users } = req.body;
-
-  if (!name || !users) {
-    res.status(400);
-    throw new Error("Missing fields");
-  }
-
-  const groupUsers = JSON.parse(users);
-
-  if (groupUsers.length < 2) {
-    res.status(400);
-    throw new Error("Need at least 2 users");
-  }
-
-  groupUsers.push(req.user._id);
-
-  const groupChat = await Chat.create({
-    chatName: name,
-    users: groupUsers,
+  const group = await Chat.create({
+    chatName: groupName,
     isGroupChat: true,
+    users: [req.user._id, ...memberIds],
     groupAdmin: req.user._id,
   });
 
-  const fullGroup = await Chat.findById(groupChat._id)
-    .populate("users", "-password")
-    .populate("groupAdmin", "-password");
+  joinChat([req.user.id, ...memberIds], group.id);
 
-  res.status(201).json(fullGroup);
+  const full = await loadChat(group._id);
+  broadcastChat(full);
 
-});
+  res.status(201).json({ ...full.toJSON(), unreadCount: 0 });
+};
 
-// RENAME GROUP
-export const renameGroup = asyncHandler(async (req, res) => {
+export const renameGroup = async (req, res) => {
+  const name = req.body?.name?.trim();
+  if (!name) throw httpError(400, "Group name is required");
+  if (name.length > 50) throw httpError(400, "Group name is too long");
 
-  const { chatId, chatName } = req.body;
+  const chat = await requireGroupAdmin(req.params.id, req.user);
 
-  const updated = await Chat.findByIdAndUpdate(
-    chatId,
-    { chatName },
-    { new: true }
-  )
-    .populate("users", "-password")
-    .populate("groupAdmin", "-password");
+  chat.chatName = name;
+  await chat.save({ timestamps: false });
 
-  res.json(updated);
+  const full = await loadChat(chat._id);
+  broadcastChat(full);
+  res.json(full);
+};
 
-});
-
-// REMOVE USER FROM GROUP
-export const removeFromGroup = asyncHandler(async (req, res) => {
-
-  const { chatId, userId } = req.body;
-
-  const updated = await Chat.findByIdAndUpdate(
-    chatId,
-    { $pull: { users: userId } },
-    { new: true }
-  )
-    .populate("users", "-password")
-    .populate("groupAdmin", "-password");
-
-  res.json(updated);
-
-});
-
-// ADD USER TO GROUP
-export const addToGroup = asyncHandler(async (req, res) => {
-
-  const { chatId, userId } = req.body;
-
-  if (!chatId || !userId) {
-    res.status(400);
-    throw new Error("chatId and userId are required");
+export const addMembers = async (req, res) => {
+  const { userIds } = req.body ?? {};
+  if (!Array.isArray(userIds) || !userIds.every(isId)) {
+    throw httpError(400, "userIds must be a list of valid ids");
   }
 
-  const chat = await Chat.findById(chatId);
+  const chat = await requireGroupAdmin(req.params.id, req.user);
 
-  if (!chat) {
-    res.status(404);
-    throw new Error("Group not found");
+  const newIds = [...new Set(userIds.map(String))].filter(
+    (id) => !chat.users.some((member) => member.equals(id))
+  );
+  if (newIds.length === 0) throw httpError(400, "Those users are already in the group");
+
+  if ((await User.countDocuments({ _id: { $in: newIds } })) !== newIds.length) {
+    throw httpError(404, "Some of the selected users no longer exist");
   }
 
-  if (!chat.isGroupChat) {
-    res.status(400);
-    throw new Error("This is not a group chat");
+  chat.users.push(...newIds);
+  await chat.save({ timestamps: false });
+
+  joinChat(newIds, chat.id);
+
+  const full = await loadChat(chat._id);
+  broadcastChat(full);
+  res.json(full);
+};
+
+// Admin removes a member, or any member removes themselves (leave)
+export const removeMember = async (req, res) => {
+  const { id, userId } = req.params;
+  if (!isId(userId)) throw httpError(400, "Invalid user id");
+
+  const chat = await findMemberChat(id, req.user._id);
+  if (!chat.isGroupChat) throw httpError(400, "This is not a group chat");
+
+  const isSelf = userId === req.user.id;
+  if (!isSelf && !isGroupAdmin(chat, req.user._id)) {
+    throw httpError(403, "Only the group admin can remove members");
+  }
+  if (!chat.users.some((member) => member.equals(userId))) {
+    throw httpError(404, "That user is not in this group");
   }
 
-  // prevent duplicates
-  if (chat.users.includes(userId)) {
-    res.status(400);
-    throw new Error("User already in group");
+  chat.users.pull(userId);
+
+  if (chat.users.length === 0) {
+    await Message.deleteMany({ chat: chat._id });
+    await chat.deleteOne();
+  } else {
+    // Hand the group over if the admin leaves
+    if (chat.groupAdmin?.equals(userId)) chat.groupAdmin = chat.users[0];
+    await chat.save({ timestamps: false });
   }
 
-  const updated = await Chat.findByIdAndUpdate(
-    chatId,
-    { $push: { users: userId } },
-    { new: true }
-  )
-    .populate("users", "-password")
-    .populate("groupAdmin", "-password");
+  leaveChat(userId, chat.id);
+  emitToUser(userId, "chat:removed", { chatId: chat.id });
 
-  res.json(updated);
-});
+  if (chat.users.length === 0) return res.json({ chatId: chat.id, removed: true });
 
-// LEAVE GROUP
-export const leaveGroup = asyncHandler(async (req, res) => {
+  const full = await loadChat(chat._id);
+  broadcastChat(full);
+  res.json(isSelf ? { chatId: chat.id, removed: true } : full);
+};
 
-  const chatId = req.params.id;
+// Mark every message in a chat as read by the current user
+export const markRead = async (req, res) => {
+  const chat = await findMemberChat(req.params.id, req.user._id);
 
-  const updated = await Chat.findByIdAndUpdate(
-    chatId,
-    { $pull: { users: req.user._id } },
-    { new: true }
+  const { modifiedCount } = await Message.updateMany(
+    { chat: chat._id, sender: { $ne: req.user._id }, seenBy: { $ne: req.user._id } },
+    { $addToSet: { seenBy: req.user._id } }
   );
 
-  res.json(updated);
-
-});
-
-// 🔥 RESET UNREAD COUNT
-export const resetUnread = asyncHandler(async (req, res) => {
-
-  const chatId = req.params.id;
-
-  const chat = await Chat.findById(chatId);
-
-  if (!chat) {
-    res.status(404);
-    throw new Error("Chat not found");
+  if (modifiedCount > 0) {
+    emitToChat(chat.id, "messages:seen", { chatId: chat.id, userId: req.user.id });
   }
 
-  chat.unreadCount.set(req.user._id.toString(), 0);
-
-  await chat.save();
-
-  res.json(chat);
-
-});
+  res.json({ chatId: chat.id });
+};

@@ -1,103 +1,112 @@
-import { useState, useContext } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Eye, EyeOff, Lock, Mail, User } from "lucide-react";
+
+import Alert from "../../components/common/Alert";
+import Field from "../../components/common/Field";
+import Spinner from "../../components/common/Spinner";
 import { registerUser } from "../../api/authApi";
-import { AuthContext } from "../../context/AuthContext";
+import { getErrorMessage } from "../../api/axios";
+import { useAuth } from "../../hooks/useAuth";
 
 const Register = () => {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const { login } = useAuth();
+
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const { login } = useContext(AuthContext);
-  const navigate = useNavigate();
+  const update = (key) => (event) => setForm((prev) => ({ ...prev, [key]: event.target.value }));
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!form.name.trim() || !form.email.trim() || !form.password) {
+      return setError("Please fill in all fields.");
+    }
+    if (form.password.length < 6) {
+      return setError("Password must be at least 6 characters.");
+    }
+
     setError("");
-
+    setLoading(true);
     try {
-      const { data } = await registerUser({ name, email, password });
+      const { data } = await registerUser({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        password: form.password,
+      });
       login(data);
-      navigate("/");
     } catch (err) {
-      setError(err.response?.data?.message || "Registration failed. Please try again.");
+      setError(getErrorMessage(err, "Could not create your account. Please try again."));
+      setLoading(false);
     }
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-grid">
-        <div className="auth-aside">
-          <div className="aside-card">
-            <p className="muted small">Why join</p>
-            <h2 className="aside-title">Start your messaging journey</h2>
-            <p className="muted">Create your account and keep all your conversations in one place.</p>
-          </div>
+    <div className="auth-card">
+      <header className="auth-card__header">
+        <h1>Create your account</h1>
+        <p>It only takes a moment to get started.</p>
+      </header>
 
-          <div className="aside-list">
-            <div className="aside-item">
-              <p className="font-semibold">Instant messages</p>
-              <p className="muted">Jump straight into conversations with real-time updates.</p>
-            </div>
-            <div className="aside-item">
-              <p className="font-semibold">Groups & teams</p>
-              <p className="muted">Create group chats for friends, work, or communities.</p>
-            </div>
-            <div className="aside-item">
-              <p className="font-semibold">Privacy first</p>
-              <p className="muted">Your data is secure with end-to-end encryption.</p>
-            </div>
-          </div>
-        </div>
-        <div className="auth-card">
-          <div className="auth-head">
-            <p className="muted small">Get started</p>
-            <h1 className="auth-title">Create account</h1>
-            <p className="muted">Join the chat network and start messaging instantly.</p>
-          </div>
+      <form className="stack stack--lg" onSubmit={handleSubmit} noValidate>
+        {error && <Alert>{error}</Alert>}
 
-          {error && <div className="alert alert-error">{error}</div>}
+        <Field
+          id="name"
+          label="Name"
+          icon={User}
+          autoComplete="name"
+          placeholder="Your name"
+          maxLength={50}
+          value={form.name}
+          onChange={update("name")}
+          autoFocus
+        />
 
-          <form onSubmit={handleSubmit} className="auth-form">
-            <label className="label">Name</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="input"
-              placeholder="Your name"
-            />
+        <Field
+          id="email"
+          label="Email"
+          icon={Mail}
+          type="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          value={form.email}
+          onChange={update("email")}
+        />
 
-            <label className="label">Email</label>
-            <input
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="input"
-              placeholder="you@example.com"
-            />
+        <Field
+          id="password"
+          label="Password"
+          icon={Lock}
+          type={showPassword ? "text" : "password"}
+          autoComplete="new-password"
+          placeholder="At least 6 characters"
+          value={form.password}
+          onChange={update("password")}
+          trailing={
+            <button
+              type="button"
+              className="icon-btn icon-btn--sm"
+              onClick={() => setShowPassword((show) => !show)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          }
+        />
 
-            <label className="label">Password</label>
-            <input
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="input"
-              placeholder="Create a password"
-            />
+        <button type="submit" className="btn btn--primary btn--lg btn--block" disabled={loading}>
+          {loading && <Spinner size={16} />}
+          Create account
+        </button>
+      </form>
 
-            <button type="submit" className="btn btn-block btn-accent">Create account</button>
-          </form>
-
-          <p className="auth-foot">
-            Already have an account?{' '}
-            <Link to="/login" className="link">Sign in</Link>
-          </p>
-        </div>
-
-      </div>
+      <p className="auth-card__footer">
+        Already have an account? <Link to="/login">Sign in</Link>
+      </p>
     </div>
   );
 };

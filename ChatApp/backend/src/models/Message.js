@@ -1,47 +1,20 @@
 import mongoose from "mongoose";
 
+const { ObjectId } = mongoose.Schema.Types;
+
 const messageSchema = new mongoose.Schema(
   {
-    sender: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    },
-
-    content: {
-      type: String,
-      trim: true,
-    },
-
-    chat: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Chat",
-    },
-    deletedFor: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
-
-    deliveredTo: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
-
-    seenBy: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
+    chat: { type: ObjectId, ref: "Chat", required: true },
+    sender: { type: ObjectId, ref: "User", required: true },
+    content: { type: String, trim: true, maxlength: 4000, default: "" },
+    // Users (other than the sender) who have read this message
+    seenBy: [{ type: ObjectId, ref: "User" }],
+    // Deleted for everyone; the content is wiped but the row stays
+    isDeleted: { type: Boolean, default: false },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-const Message = mongoose.model("Message", messageSchema);
+messageSchema.index({ chat: 1, _id: -1 });
 
-export default Message;
+export default mongoose.model("Message", messageSchema);

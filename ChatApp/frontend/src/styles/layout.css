@@ -1,0 +1,151 @@
+/* ==========================================================================
+   App shell: navigation rail + page area, and the two-pane chat page
+   ========================================================================== */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail-w) minmax(0, 1fr);
+  height: 100dvh;
+}
+
+.shell__main {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---------- navigation rail ---------- */
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.rail__logo {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.rail__group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.rail__group--end {
+  margin-top: auto;
+}
+
+.rail__btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  color: var(--text-2);
+  transition: background 0.15s, color 0.15s;
+}
+.rail__btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.rail__btn.is-active {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.rail__badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 18px;
+  height: 18px;
+  font-size: 10px;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+/* ---------- chat page ---------- */
+
+.chat-page {
+  display: grid;
+  grid-template-columns: var(--list-w) minmax(0, 1fr);
+  height: 100%;
+}
+
+.chat-main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  background: var(--bg);
+}
+.chat-main > .empty {
+  flex: 1;
+  justify-content: center;
+}
+
+/* ---------- tablet & phone ---------- */
+
+@media (max-width: 1023px) {
+  :root {
+    --list-w: 300px;
+  }
+}
+
+@media (max-width: 767px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .shell__main {
+    order: 1;
+  }
+
+  /* the rail becomes a bottom bar, hidden while a chat is open */
+  .rail {
+    order: 2;
+    flex-direction: row;
+    justify-content: space-around;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    border-right: 0;
+    border-top: 1px solid var(--border);
+  }
+  .rail__logo {
+    display: none;
+  }
+  .rail__group {
+    flex-direction: row;
+    gap: 4px;
+  }
+  .rail__group--end {
+    margin-top: 0;
+  }
+  .shell--chat-open .rail {
+    display: none;
+  }
+
+  /* one pane at a time */
+  .chat-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .chat-page--open .conv {
+    display: none;
+  }
+  .chat-page:not(.chat-page--open) .chat-main {
+    display: none;
+  }
+}
