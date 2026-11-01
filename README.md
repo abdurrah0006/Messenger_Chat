@@ -2,6 +2,10 @@
 
 A full-stack real-time messaging platform built using the **MERN Stack + Socket.IO**, allowing users to communicate through **private chats and group conversations** with live messaging, notifications, typing indicators, delivery status, and authentication.
 
+### 🏠 Chat Main Light
+
+![ChatMainLight](./image/Chat_Light.png)
+
 ---
 
 ## ✨ Features
@@ -195,7 +199,7 @@ npm run dev
 
 ###  🔐 Login
 
-![Login](./image/Chat_login.png)
+![Login](./image/Chat_Login.png)
 
 ### 🔏 Register
 
@@ -211,7 +215,7 @@ npm run dev
 
 ### 👥 Group Chat
 
-![Group Chat](./image/Group_Chat.png)
+![Group Chat](./image/Group_chat.png)
 
 ---
 
